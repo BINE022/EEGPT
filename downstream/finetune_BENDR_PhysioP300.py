@@ -177,21 +177,43 @@ global max_epochs
 global steps_per_epoch
 global max_lr
 
+class P300SubjectDataset(Dataset):
+    def __init__(self, root, subjects):
+        """
+        root: path to PhysioNetP300 folder
+        subjects: list of subject numbers to include, e.g. [1,2,3]
+        """
+        self.files = []
+        self.labels = []
+
+        for label in ['0','1']:
+            folder = os.path.join(root, label)
+            for f in os.listdir(folder):
+                if f.endswith('.pt') and any(f".sub{s}" in f for s in subjects):
+                    self.files.append(os.path.join(folder, f))
+                    self.labels.append(int(label))
+
+    def __len__(self):
+        return len(self.files)
+
+    def __getitem__(self, idx):
+        x = torch.load(self.files[idx])
+        y = self.labels[idx]
+        x = x.float()  # Convert to float32
+        return x, y
+
 batch_size=64
 max_epochs = 100
 
 
 all_subjects = [1,2,3,4,5,6,7,9,11]
-for i,sub in enumerate(all_subjects):
-    sub_train = [f".sub{x}" for x in all_subjects if x!=sub]
-    sub_valid = [f".sub{sub}"]
-    print(sub_train, sub_valid)
-    train_dataset = torchvision.datasets.DatasetFolder(root="../datasets/downstream/PhysioNetP300", loader=torch.load, extensions=sub_train)
-    valid_dataset = torchvision.datasets.DatasetFolder(root="../datasets/downstream/PhysioNetP300", loader=torch.load, extensions=sub_valid)
+for val_sub in (all_subjects):
 
+    train_subs = [s for s in all_subjects if s != val_sub] # all except the current
+    train_dataset = P300SubjectDataset(root="../datasets/downstream/PhysioNetP300", subjects=train_subs)
+    val_dataset = P300SubjectDataset(root="../datasets/downstream/PhysioNetP300", subjects=[val_sub])
     train_loader = torch.utils.data.DataLoader(train_dataset, batch_size=batch_size, num_workers=8, shuffle=True)
-    valid_loader = torch.utils.data.DataLoader(valid_dataset, batch_size=batch_size, num_workers=8, shuffle=False)
-
+    valid_loader = torch.utils.data.DataLoader(val_dataset, batch_size=batch_size, num_workers=8, shuffle=False)
     steps_per_epoch = math.ceil(len(train_loader))
 
     # init model
@@ -204,7 +226,7 @@ for i,sub in enumerate(all_subjects):
     trainer = pl.Trainer(accelerator='cuda',
                         max_epochs=max_epochs, 
                         callbacks=callbacks,
-                        logger=[pl_loggers.TensorBoardLogger('./logs/', name="BENDR_PhysioP300_tb", version=f"subject{sub}"), 
+                        logger=[pl_loggers.TensorBoardLogger('./logs/', name="BENDR_PhysioP300_tb", version=f"subject{val_sub}"), 
                                 pl_loggers.CSVLogger('./logs/', name="BENDR_PhysioP300_csv")])
 
     trainer.fit(model, train_loader, valid_loader, ckpt_path='last')

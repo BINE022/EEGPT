@@ -60,9 +60,9 @@ datasets/downstream/KaggleERN/test/Data_S25_Sess05.csv
 
 PhysioP300 datasets can be downloaded from https://physionet.org/content/erpbci/1.0.0/ and save into the `datasets/downstream/erp-based-brain-computer-interface-recordings-1.0.0` folder, which organized as:
 ```
-datasets/downstream/erp-based-brain-computer-interface-recordings-1.0.0/files/s01/rc01.edf
+datasets/downstream/erp-based-brain-computer-interface-recordings-1.0.0/files/erpbci/1.0.0/s01/rc01.edf
 ...
-datasets/downstream/erp-based-brain-computer-interface-recordings-1.0.0/files/s11/rc01.edf
+datasets/downstream/erp-based-brain-computer-interface-recordings-1.0.0/files/erpbci/1.0.0/s11/rc01.edf
 ...
 Then run the following command to preprocess the data:
 ```preprocess

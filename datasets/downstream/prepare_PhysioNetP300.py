@@ -14,7 +14,8 @@ tmin=-0.1
 tmax=2
 for sub in [2,3,4,5,6,7,9,11]:
 
-    path = "erp-based-brain-computer-interface-recordings-1.0.0/files/s{:02d}".format(sub)
+    #path = "erp-based-brain-computer-interface-recordings-1.0.0/files/s{:02d}".format(sub)
+    path="erp-based-brain-computer-interface-recordings-1.0.0/files/erpbci/1.0.0/s{:02d}".format(sub) # based on the current state of the dataset
     for file in os.listdir(path):
         if not file.endswith(".edf"):continue
         raw = mne.io.read_raw_edf(os.path.join(path, file))
@@ -44,7 +45,7 @@ for sub in [2,3,4,5,6,7,9,11]:
             # -- save
             x = torch.tensor(d*1e3)
             y = label
-            spath = dataset_fold+f'{y}/'
-            os.makedirs(path,exist_ok=True)
-            spath = spath + f'{i}.sub{sub}'
+            spath = os.path.join(dataset_fold, f'{y}')
+            os.makedirs(spath, exist_ok=True)  # create the correct folder
+            spath = os.path.join(spath, f'{i}.sub{sub}.pt')  # add .pt for PyTorch files
             torch.save(x, spath)
