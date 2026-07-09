@@ -1,0 +1,34 @@
+# Conda environment for EEGPT pretraining (TRAINING only).
+# Recreates the exact versions used on the training server (neuromm env).
+#
+# Create:   conda env create -f environment.yml
+# Activate: conda activate eegpt
+#
+# For PREPROCESSING (preprocess_tuh.py / preprocess_moabb.py), create a separate env:
+#   conda create -n eegpt-prep python=3.10
+#   conda activate eegpt-prep
+#   pip install -r requirements-preprocess.txt
+#
+# Tested on Ubuntu 20.04, CUDA 11.8, NVIDIA driver >=515.65.01, RTX 3090.
+
+name: eegpt
+channels:
+  - pytorch
+  - conda-forge
+  - defaults
+dependencies:
+  - python=3.11
+  - pip=24.*
+  - pip:
+      - --extra-index-url https://download.pytorch.org/whl/cu118
+      - torch==2.6.0+cu118
+      - torchvision==0.21.0+cu118
+      - torchaudio==2.6.0+cu118
+      - pytorch-lightning==2.6.5
+      - torchmetrics==1.9.0
+      - numpy==2.4.3
+      - pandas==3.0.3
+      - scipy==1.17.1
+      - einops==0.8.2
+      - tqdm==4.67.3
+      - tensorboardX==2.6.5

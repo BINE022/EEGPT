@@ -1,0 +1,18 @@
+# EEGPT preprocessing — additional dependencies for preprocess_tuh.py / preprocess_moabb.py
+#
+# These conflict with requirements.txt (moabb 1.2.0 needs numpy<2; training uses numpy>=2).
+# Install in a SEPARATE conda env:
+#   conda create -n eegpt-prep python=3.10
+#   conda activate eegpt-prep
+#   pip install -r requirements-preprocess.txt
+#
+# Only needed if you're regenerating TUHEEG_Processed / Data_processed from raw data.
+# If your data is already preprocessed, skip this file entirely.
+
+mne==1.9.0
+moabb==1.2.0                      # Dreyer2023 dataset requires moabb>=1.3.0
+mne-bids==0.16.0
+numpy==1.26.4                     # moabb 1.2.0 not compatible with numpy>=2
+pandas==1.5.3
+scipy==1.10.1
+tqdm==4.65.0
