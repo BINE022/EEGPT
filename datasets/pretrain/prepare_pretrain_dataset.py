@@ -1,5 +1,9 @@
 """
 use this script to prepare the mixed pretraining dataset
+
+Requires torcheeg==1.1.0 (dataset classes and their chunk_size defaults vary across
+versions) and mne==1.4.2. Builds the PhysioNetMI / tsu_benchmark / seed / m3cv / HGD
+tags into ./merged/{Train,Valid}Folder/0/.
 """
 
 import os
@@ -7,6 +11,15 @@ import torch
 import shutil
 import random
 import mne
+
+# scipy >= 1.13 removed scipy.signal.hann, which torcheeg 1.1.0 imports at module
+# load. The PhysioNetMI io build additionally runs joblib/loky workers, which start
+# fresh interpreters that do NOT execute this shim -- for that stage put these three
+# lines into a sitecustomize.py and prepend its directory to PYTHONPATH.
+import scipy.signal as _scipy_signal
+import scipy.signal.windows as _scipy_windows
+if not hasattr(_scipy_signal, "hann"):
+    _scipy_signal.hann = _scipy_windows.hann
 
 import pandas as pd
 from torcheeg.datasets import CSVFolderDataset
@@ -184,6 +197,8 @@ def get_TSU_dataset():
     dataset = TSUBenckmarkDataset(
             root_path="./TSUBenchmark/",
             io_path=data_root_path+'io/tsu_benchmark',
+            # 1000 points @ 250 Hz = 4 s
+            chunk_size=1000,
             online_transform=transforms.Compose([
                 transforms.PickElectrode(transforms.PickElectrode.to_index_list(use_channels_names, TSUBENCHMARK_CHANNEL_LIST)),
                 transforms.ToTensor(),
@@ -212,8 +227,13 @@ def get_M3CV_dataset():
 
 def get_SEED_dataset():
     dataset = SEEDDataset(
+                            # root_path must be the Preprocessed_EEG content layer
+                            # (label.mat, readme.txt, *.mat) -- pointing at the parent
+                            # folder crashes SEEDDataset on channel-order.xlsx
                             root_path="./SEED/",
                             io_path=data_root_path+'io/seed',
+                            # 2000 points @ 200 Hz = 10 s
+                            chunk_size=2000,
                           online_transform=transforms.Compose([
                               transforms.PickElectrode(transforms.PickElectrode.to_index_list(use_channels_names, SEED_CHANNEL_LIST)),
                               transforms.ToTensor(),
@@ -228,26 +248,90 @@ def get_SEED_dataset():
     return dataset
 
 
+# --------------- HGD
+
+HGD_CHANNEL_NAMES = ['EEG Fp1', 'EEG Fp2', 'EEG Fpz',
+                 'EEG F7', 'EEG F3', 'EEG Fz', 'EEG F4', 'EEG F8',
+                 'EEG FC5', 'EEG FC1', 'EEG FC2', 'EEG FC6',
+                 'EEG M1', 'EEG T7', 'EEG C3', 'EEG Cz', 'EEG C4', 'EEG T8', 'EEG M2',
+                 'EEG CP5', 'EEG CP1', 'EEG CP2', 'EEG CP6',
+                 'EEG P7', 'EEG P3', 'EEG Pz', 'EEG P4', 'EEG P8',
+
+                 'EEG POz', 'EEG O1', 'EEG Oz', 'EEG O2',
+
+                 'EOG EOGh', 'EOG EOGv', 'EMG EMG_RH', 'EMG EMG_LH', 'EMG EMG_RF',
+
+                 'EEG AF7', 'EEG AF3', 'EEG AF4', 'EEG AF8',
+                 'EEG F5', 'EEG F1', 'EEG F2', 'EEG F6',
+
+                 'EEG FC3', 'EEG FCz', 'EEG FC4',
+                 'EEG C5', 'EEG C1', 'EEG C2', 'EEG C6',
+                 'EEG CP3', 'EEG CPz', 'EEG CP4',
+                 'EEG P5', 'EEG P1', 'EEG P2', 'EEG P6',
+                 'EEG PO5', 'EEG PO3', 'EEG PO4', 'EEG PO6',
+                 'EEG FT7', 'EEG FT8', 'EEG TP7', 'EEG TP8',
+                 'EEG PO7', 'EEG PO8',
+                 'EEG FT9', 'EEG FT10',
+
+                 'EEG TPP9h', 'EEG TPP10h',
+
+                 'EEG PO9', 'EEG PO10', 'EEG P9', 'EEG P10', 'EEG AFF1', 'EEG AFz', 'EEG AFF2', 'EEG FFC5h', 'EEG FFC3h', 'EEG FFC4h', 'EEG FFC6h', 'EEG FCC5h',
+                 'EEG FCC3h', 'EEG FCC4h', 'EEG FCC6h', 'EEG CCP5h', 'EEG CCP3h', 'EEG CCP4h', 'EEG CCP6h', 'EEG CPP5h', 'EEG CPP3h', 'EEG CPP4h', 'EEG CPP6h',
+                 'EEG PPO1', 'EEG PPO2', 'EEG I1', 'EEG Iz', 'EEG I2', 'EEG AFp3h', 'EEG AFp4h', 'EEG AFF5h', 'EEG AFF6h', 'EEG FFT7h', 'EEG FFC1h', 'EEG FFC2h',
+                 'EEG FFT8h', 'EEG FTT9h', 'EEG FTT7h', 'EEG FCC1h', 'EEG FCC2h', 'EEG FTT8h', 'EEG FTT10h', 'EEG TTP7h', 'EEG CCP1h', 'EEG CCP2h', 'EEG TTP8h',
+                 'EEG TPP7h', 'EEG CPP1h', 'EEG CPP2h', 'EEG TPP8h', 'EEG PPO9h', 'EEG PPO5h', 'EEG PPO6h', 'EEG PPO10h', 'EEG POO9h', 'EEG POO3h', 'EEG POO4h',
+                 'EEG POO10h', 'EEG OI1h', 'EEG OI2h']
+
+
+def get_HGD_dataset():
+    # plain mne pipeline (no torcheeg io); deterministic subject -> phase -> epoch
+    # order; yields (tensor [58, 2560] float64, sample name)
+    mapping = {k: (k[4:]).upper() for k in HGD_CHANNEL_NAMES}
+    stims = [1, 2, 3, 4]
+    for subject in range(1, 15):
+        for phase in ['train', 'test']:
+            file_path = os.path.join("./high_gamma/", phase, '{}.edf'.format(subject))
+            raw_eeg = mne.io.read_raw_edf(file_path)
+            raw_eeg.rename_channels(mapping)
+            raw_eeg.pick_channels(use_channels_names)
+            events, event_id = mne.events_from_annotations(raw_eeg)
+            epoch = mne.Epochs(raw_eeg, events, event_id=stims, tmin=0,
+                               tmax=10 - 1 / raw_eeg.info['sfreq'], baseline=None,
+                               preload=True, proj=False)
+            echans = [x.upper().strip('.') for x in epoch.ch_names]
+            choice_channels = [echans.index(ch.upper()) for ch in use_channels_names]
+            epoch = epoch.resample(256)      # resample
+            x_data = epoch.get_data() * 1000 # unify units (V -> 1000 uV)
+            for i in range(len(x_data)):
+                data = torch.tensor(x_data[i])[choice_channels] # unify channel order
+                data = data - data.mean(-2) # average reference
+                yield data.clone().detach(), f"HGD_{phase}_s{subject}_{i}"
+
+
 if __name__=="__main__":
     import random
     import os
     import tqdm
-    
-    for tag in ["PhysioNetMI", "tsu_benchmark", "seed"]: #, "m3cv"
-        if tag == "PhysioNetMI":
-            dataset = get_physionet_dataset()
-        elif tag == "tsu_benchmark":
-            dataset = get_TSU_dataset()
-        elif tag == "m3cv":
-            dataset = get_M3CV_dataset()
-        elif tag == "seed":
-            dataset = get_SEED_dataset()
+
+    for tag in ["PhysioNetMI", "tsu_benchmark", "seed", "m3cv", "HGD"]:
+        if tag == "HGD":
+            samples = get_HGD_dataset() # yields (tensor, sample name)
         else:
-            raise ValueError("Invalid tag")
-        print(len(dataset))
-        print(dataset[0][0].shape)
-        print(dataset[0][0].min(),dataset[0][0].max(), dataset[0][0].mean(),dataset[0][0].std())
-        for i, (x,y) in tqdm.tqdm(enumerate(dataset)):
+            if tag == "PhysioNetMI":
+                dataset = get_physionet_dataset()
+            elif tag == "tsu_benchmark":
+                dataset = get_TSU_dataset()
+            elif tag == "m3cv":
+                dataset = get_M3CV_dataset()
+            elif tag == "seed":
+                dataset = get_SEED_dataset()
+            else:
+                raise ValueError("Invalid tag")
+            print(len(dataset))
+            print(dataset[0][0].shape)
+            print(dataset[0][0].min(),dataset[0][0].max(), dataset[0][0].mean(),dataset[0][0].std())
+            samples = ((x, tag+f"_{i}") for i, (x,y) in enumerate(dataset))
+        for x, sample_name in tqdm.tqdm(samples):
             dst="./merged/"
             if random.random()<0.1:
                 dst+="ValidFolder/0/"
@@ -256,7 +340,7 @@ if __name__=="__main__":
             os.makedirs(dst, exist_ok=True)
             data = x.squeeze_(0)
             # data = data.clone().detach().cpu()
-            print(i, data.shape, len(data.shape)==2 and data.shape[0]==58 and data.shape[1]>=1024)
+            print(sample_name, data.shape, len(data.shape)==2 and data.shape[0]==58 and data.shape[1]>=1024)
             assert len(data.shape)==2 and data.shape[0]==58 and data.shape[1]>=1024
-            torch.save(data, dst + tag+f"_{i}.edf")
+            torch.save(data, dst + sample_name + ".edf")
             del data, x

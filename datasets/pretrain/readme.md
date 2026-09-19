@@ -58,3 +58,15 @@ readme.txt
 ...
 15_20131105.mat
 ```
+NOTE: `SEED` must directly contain these files (the `Preprocessed_EEG` **content layer**). If the parent folder is used instead, `SEEDDataset` crashes with `invalid literal for int()` (it tries to parse `channel-order.xlsx` as a subject directory).
+
+### HGD (High-Gamma Dataset)
+
+Download URL: https://gin.g-node.org/robintibor/high-gamma-dataset
+
+In order to use this dataset, save it into `high_gamma` folder, containing the following files:
+```
+high_gamma/train/1.edf ... high_gamma/train/14.edf
+high_gamma/test/1.edf ... high_gamma/test/14.edf
+```
+
